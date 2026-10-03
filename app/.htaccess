@@ -1,0 +1,19 @@
+# ---------------------------------------------------------------------
+#  Deny direct web access to the application internals.
+#  The document root should point at public/, but these rules keep the
+#  sensitive directories unreachable even if that is misconfigured.
+# ---------------------------------------------------------------------
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+
+# Apache 2.2 fallback
+<IfModule mod_access_compat.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

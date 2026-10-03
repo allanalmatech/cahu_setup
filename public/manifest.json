@@ -1,0 +1,21 @@
+{
+    "name": "CAHU Agribusiness Platform",
+    "short_name": "CAHU",
+    "description": "Field and farm records for CAHU extension officers and farmers.",
+    "lang": "en-UG",
+    "dir": "ltr",
+    "start_url": "./login",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#ffffff",
+    "theme_color": "#1e5a3c",
+    "icons": [
+        {
+            "src": "./assets/img/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}

@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------
+#  Deny direct web access to the uploads directory.
+#
+#  Uploaded files are served by Http\Controllers\UploadController, which
+#  checks the session, resolves the path against the uploads root, and
+#  decides between inline and attachment. Nothing in here should ever be
+#  handed out by the web server directly, for three reasons:
+#
+#    - it would bypass the session check, making every farmer ID scan and
+#      consent form a public URL;
+#    - a static handler serves whatever bytes are in the file, so an HTML
+#      or SVG upload would execute in the site's origin;
+#    - a PHP file that ever reached this directory would be executed.
+#
+#  This is the belt to that controller's braces, and it also covers the
+#  servers that ignore .htaccess by never being reachable in the first
+#  place: a correctly configured document root does not contain this
+#  directory at all, so a request for it does not exist to be refused.
+# ---------------------------------------------------------------------
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule . - [F,L]
+</IfModule>
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+
+# Apache 2.2 fallback
+<IfModule mod_access_compat.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

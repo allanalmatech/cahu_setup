@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------
+#  CAHU Platform - document root
+#
+#  Point the web server's document root here. public/ contains the front
+#  controller, the compiled assets, and nothing else: no configuration, no
+#  application code, no uploads. The parent directory's .htaccess refuses
+#  everything else, and each sensitive directory carries its own.
+# ---------------------------------------------------------------------
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Preserve the Authorization header for the REST API. Required under
+    # CGI/FastCGI, where the header is dropped before PHP sees it and every
+    # API call would arrive as an anonymous request.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # -----------------------------------------------------------------
+    # Never serve these, even though they are inside the document root.
+    # -----------------------------------------------------------------
+
+    # Dotfiles. Nothing here should ever be requested, and a .htaccess or
+    # editor backup being readable is how configuration leaks.
+    RewriteRule (?:^|/)\. - [F,L]
+
+    # Anything that could be executed or interpreted rather than downloaded.
+    # A file with one of these extensions should be read as data, so it is
+    # refused rather than served: the upload rules below would otherwise be
+    # the only thing standing between an uploaded .php file and code
+    # execution, and they only cover one directory.
+    #
+    # Two names are exempt. index.php has to be: it is the front controller,
+    # and refusing it takes the whole application offline. install.php is the
+    # browser installer, which cannot live anywhere else - the project root's
+    # own rules refuse every .php that is not index.php, and the sensitive
+    # directories below it are all closed to the browser - so it is allowed
+    # here and nowhere else. It writes storage/install.lock when it finishes
+    # and then refuses to run again; deleting the file after a successful
+    # install is still the right thing to do.
+    RewriteRule ^(?!index\.php$|install\.php$).*\.(?:php|phtml|phar|pl|py|cgi|sh|htaccess)$ - [F,L,NC]
+
+    # -----------------------------------------------------------------
+    # Serve the application.
+    # -----------------------------------------------------------------
+
+    # A real file - assets, and nothing else - is served directly.
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Everything else is a route: /, /farmers, /api/v1/sync/pull.
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    # The API answers with JSON and the pages with HTML; neither should ever be
+    # sniffed into something else. This is also what stops an uploaded file
+    # being treated as active content.
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Clickjacking: a cooperative officer is more likely to be signed in than a
+    # portal user, so the dashboard is worth framing less than the public pages.
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # No microphone, no payment, no geolocation for the browser: the field app
+    # does its own GPS in the handset, the site does not ask for it.
+    Header always set Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=()"
+
+    # TRACE echoes the request back, which is a credential reflected to whoever
+    # sent it on hosts that still enable it.
+    RequestHeader unset Trace
+</IfModule>
+
+<IfModule mod_autoindex.c>
+    # Wrapped: a host that does not grant AllowOverride Options answers 500 to
+    # a bare "Options" directive rather than ignoring it.
+    Options -Indexes
+</IfModule>
+
+DirectoryIndex index.php

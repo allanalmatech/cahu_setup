@@ -1,0 +1,41 @@
+# ---------------------------------------------------------------------
+#  Neutralise anything that lands in this directory.
+#
+#  Uploads belong in storage/uploads, which is outside the document root
+#  and served by Http\Controllers\UploadController after a session check.
+#  If UPLOAD_PATH is pointed here instead, a stored file is reachable by
+#  the web server directly, and a static handler hands over whatever
+#  bytes it finds. An HTML or SVG upload would then render in the site's
+#  own origin, and a .php upload would be executed.
+#
+#  So every type the browser might treat as active content - script,
+#  markup, style - is answered as a download with a generic type instead.
+#  A file that is not a recognised image or document is handed over as
+#  bytes to save, never as something the browser will run.
+#
+#  This is deliberately scoped to this directory rather than kept in
+#  public/.htaccess: the front controller and the browser installer are
+#  PHP, and the compiled assets are JavaScript, so a document-wide
+#  version of the same rule sends every page and every script to the
+#  browser as a download and takes the entire site offline.
+# ---------------------------------------------------------------------
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(?i:php|phtml|phar|html?|xht[ml]?|svg|swf|js|xml)$">
+        Header always set Content-Disposition "attachment"
+        Header always set Content-Type "application/octet-stream"
+    </FilesMatch>
+</IfModule>
+
+# Apache 2.2 hosts without mod_headers have nothing above to fall back
+# on, so refuse the executable types outright.
+<IfModule !mod_headers.c>
+    <IfModule mod_rewrite.c>
+        RewriteEngine On
+        RewriteRule .*\.(?i:php|phtml|phar|pl|py|cgi|sh)$ - [F,L]
+    </IfModule>
+</IfModule>
+
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>

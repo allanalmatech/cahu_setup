@@ -1,0 +1,94 @@
+# ---------------------------------------------------------------------
+#  CAHU Platform - project root
+#
+#  The intended document root is public/. This file is the safety net
+#  for the case where the document root is (mis)configured to point here
+#  instead, which is the single most common way a PHP app ends up with
+#  its internals published by accident.
+#
+#  Two jobs, in this order:
+#    1. Refuse anything that must never be requested over HTTP.
+#    2. Send everything else through public/, so pretty URLs work even
+#       without changing the server config.
+#
+#  There is deliberately no blanket "Require all denied" here. That would
+#  also cover public/, because a child directory inherits it, and the
+#  rewrite below would 403 every real request. The protection is therefore
+#  expressed as explicit deny rules plus one .htaccess per sensitive
+#  directory, so each one keeps working even if this file is lost.
+# ---------------------------------------------------------------------
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # -----------------------------------------------------------------
+    # 1. Never serve these.
+    # -----------------------------------------------------------------
+
+    # Application code, configuration, and anything holding a credential.
+    # Each of these also has its own .htaccess; this repeats the rule so
+    # that a directory renamed or moved by a deploy script is still
+    # covered by its parent's list.
+    RewriteRule ^(?:app|config|database|storage|tools|cron|vendor)/ - [F,L]
+
+    # The installer. It creates the first administrator, seeds the
+    # database and writes config/.env, so it is the most valuable file on
+    # the disk to an attacker. It also refuses to run over HTTP in PHP
+    # itself, so this rule is belt and braces.
+    RewriteRule ^install\.php$ - [F,L]
+
+    # Dotfiles: .env, .git, .htaccess, editor leftovers.
+    RewriteRule (?:^|/)\. - [F,L]
+
+    # Backups and editor droppings that tend to sit beside real files, and
+    # the archive/extension types that should never be fetched directly.
+    # schema.sql is inside database/ and already denied; this catches a
+    # stray copy left somewhere else.
+    RewriteRule \.(?:bak|old|orig|save|swp|swo|sql|sqlite|log|ini|sh|inc|zip|tar|gz|tgz)$ - [F,L]
+
+    # Server-side includes and CGI are never used by this application.
+    RewriteRule \.(?:phtml|phar|pl|py|cgi|sh)$ - [F,L,NC]
+
+    # A stray script dropped in the root is not part of the application.
+    # Two paths are exempt: index.php, which is the redirect below and is
+    # also what DirectoryIndex resolves to, and anything under public/,
+    # which is the application's own front controller. The negative
+    # lookahead is what keeps them reachable while everything else with a
+    # .php extension is refused.
+    RewriteRule ^(?!index\.php$|public/).*\.php$ - [F,L,NC]
+
+    # -----------------------------------------------------------------
+    # 2. Serve the application.
+    # -----------------------------------------------------------------
+
+    # A real file at the path that was asked for is served as-is.
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Everything else is handed to public/, which then decides what it is: a
+    # file that exists there is served directly, and anything else is a route
+    # for its front controller.
+    #
+    # The hand-off matters because of the document root being one level too
+    # high. From this directory public/assets/app.css is not the file that was
+    # requested - the browser asked for /cahu3/assets/app.css - so a file test
+    # made here cannot see anything under public/. Doing it there instead, once
+    # the path has been rewritten, works because REQUEST_FILENAME is then
+    # correct. Getting this wrong is not a cosmetic 404: every stylesheet and
+    # script falls through to the front controller and comes back as a routed
+    # 404 page, which reads as a missing page rather than a missing asset.
+    #
+    # REQUEST_URI is never modified, so Core\Request still sees the path the
+    # browser asked for and routing is unchanged.
+    RewriteRule ^(.*)$ public/$1 [QSA,L]
+</IfModule>
+
+# No directory listings. An index of the filesystem tells an attacker what
+# exists, and no visitor benefits from one. Wrapped because a host that
+# does not grant AllowOverride Options answers 500 to a bare directive
+# rather than ignoring it.
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
+
+DirectoryIndex index.php
